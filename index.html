@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#07070c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pack Vault">
+<meta name="description" content="A pack-opening simulator with real pull rates and real card prices that tracks what you spend versus what you pull.">
+<title>Pack Vault</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="bal">
+      <div class="lbl">Balance</div>
+      <div class="amt" id="balance">$100.00</div>
+    </div>
+    <div class="net" id="netPill">Net $0.00</div>
+    <button class="icon" id="muteBtn" aria-label="Sound on/off">🔊</button>
+    <button class="icon" id="setBtn" aria-label="Settings">⚙️</button>
+  </header>
+
+  <main>
+    <!-- RIP -->
+    <section class="view active" id="v-rip">
+      <div class="sets" id="setPicker"></div>
+      <div class="stage" id="stage">
+        <div class="pack-wrap" id="packWrap">
+          <div class="pack" id="pack">
+            <div class="pack-top" id="packTop"><div class="crimp"></div></div>
+            <div class="tearline" id="tearline"></div>
+            <div class="pack-body">
+              <div class="pack-art" id="packArt"></div>
+              <div class="pack-foil"></div>
+              <div class="pack-text">
+                <div class="pack-code" id="packCode"></div>
+                <div class="pack-name" id="packName"></div>
+                <div class="pack-sub">10 cards · real odds</div>
+              </div>
+            </div>
+          </div>
+          <div class="hint" id="hint">Swipe across the top to rip ➜</div>
+          <div class="price-row">
+            <div><span class="k">Pack costs</span><b id="packPrice"></b></div>
+            <div><span class="k">Average pull</span><b id="packEv"></b></div>
+          </div>
+          <button class="cta" id="ripBtn">Rip it open</button>
+          <p class="fine" id="evLine"></p>
+        </div>
+
+        <div class="reveal hidden" id="reveal">
+          <div class="tally">
+            <div><span class="k">Paid</span><b id="tPaid"></b></div>
+            <div><span class="k">Pulled</span><b id="tPulled">$0.00</b></div>
+            <div><span class="k">Cards</span><b id="tCount">0/10</b></div>
+          </div>
+          <div class="deck" id="deck"></div>
+          <div class="tapnote" id="tapNote">Tap the card to flip</div>
+          <div class="row-btns">
+            <button class="ghost" id="revealAllBtn">Flip all</button>
+          </div>
+          <div class="strip" id="strip"></div>
+        </div>
+
+        <div class="summary hidden" id="summary">
+          <div class="sum-title" id="sumTitle"></div>
+          <div class="sum-grid">
+            <div><span class="k">You paid</span><b id="sPaid"></b></div>
+            <div><span class="k">Cards worth</span><b id="sVal"></b></div>
+            <div class="big"><span class="k">This pack</span><b id="sNet"></b></div>
+          </div>
+          <div class="sum-best" id="sumBest"></div>
+          <p class="fine" id="sumNote"></p>
+          <div class="sum-cards" id="sumCards"></div>
+          <div class="row-btns">
+            <button class="ghost" id="doneBtn">Done</button>
+            <button class="cta small" id="againBtn">Open another</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section class="view" id="v-stats">
+      <div class="lesson" id="lesson"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="card-panel">
+        <div class="ph">Money in vs value out <span class="legend"><i class="lg-s"></i>Spent <i class="lg-v"></i>Cards worth</span></div>
+        <div id="chart"></div>
+      </div>
+      <div class="card-panel">
+        <div class="ph">Every pack</div>
+        <div class="table-wrap"><table class="log" id="logTable"></table></div>
+      </div>
+    </section>
+
+    <!-- BINDER -->
+    <section class="view" id="v-binder">
+      <div class="binder-head">
+        <div><div class="k">Collection worth</div><div class="bv" id="binderVal">$0.00</div></div>
+        <div class="bc" id="binderCount"></div>
+      </div>
+      <div class="filters">
+        <select id="fSet"></select>
+        <select id="fRar"></select>
+        <select id="fSort">
+          <option value="value">Most valuable</option>
+          <option value="count">Most copies</option>
+          <option value="name">A–Z</option>
+          <option value="recent">Newest</option>
+        </select>
+      </div>
+      <div class="binder" id="binder"></div>
+    </section>
+
+    <!-- ODDS -->
+    <section class="view" id="v-odds">
+      <div class="odds-intro">Real odds from thousands of opened packs, and real card prices. "Average pull" is what one pack's cards are worth on average.</div>
+      <div id="oddsList"></div>
+      <footer class="sources" id="sources"></footer>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button class="tab active" data-v="rip"><span>✨</span>Rip</button>
+    <button class="tab" data-v="stats"><span>📊</span>Stats</button>
+    <button class="tab" data-v="binder"><span>📒</span>Binder</button>
+    <button class="tab" data-v="odds"><span>🎲</span>Odds</button>
+  </nav>
+</div>
+
+<div class="sheet hidden" id="sheet">
+  <div class="sheet-card">
+    <div class="sheet-h">Settings</div>
+    <label class="field">Starting money
+      <div class="inrow"><span>$</span><input id="startInput" type="number" inputmode="decimal" min="1" step="1"></div>
+    </label>
+    <div class="field">Add allowance
+      <div class="chips"><button data-add="5">+$5</button><button data-add="10">+$10</button><button data-add="20">+$20</button></div>
+    </div>
+    <label class="toggle"><input type="checkbox" id="resaleT"><span>Realistic resale (65%)</span></label>
+    <p class="fine">Card prices are what cards are "worth" on paper. If you actually sell, stores and buyers usually pay much less. Turn this on to count cards at 65% of their price.</p>
+    <div class="field">Pack price
+      <div class="seg" id="priceSeg"><button data-p="market">Real price now</button><button data-p="msrp">Store sticker</button></div>
+    </div>
+    <p class="fine">"Real price now" is what a single pack sells for today (TCGplayer market). "Store sticker" is the $4.49 retail price, when stores have them.</p>
+    <label class="toggle"><input type="checkbox" id="hapticT"><span>Vibration</span></label>
+    <div class="row-btns">
+      <button class="danger" id="resetBtn">Reset everything</button>
+      <button class="cta small" id="closeSheet">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="confirm">
+  <div class="sheet-card">
+    <div class="sheet-h">Start over?</div>
+    <p>This clears your collection, packs and stats on this device.</p>
+    <div class="row-btns"><button class="ghost" id="noReset">Keep it</button><button class="danger" id="yesReset">Reset</button></div>
+  </div>
+</div>
+
+<div class="celebrate hidden" id="celebrate">
+  <canvas id="fx"></canvas>
+  <div class="cel-inner">
+    <div class="cel-tag" id="celTag"></div>
+    <div class="cel-card" id="celCard"></div>
+    <div class="cel-name" id="celName"></div>
+    <div class="cel-val" id="celVal"></div>
+    <div class="cel-note">Worth this on paper. Selling usually gets about 65%.</div>
+    <button class="cta small" id="celOk">Awesome!</button>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
