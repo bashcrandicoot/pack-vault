@@ -14,7 +14,7 @@ On the phone: open the URL in Safari → Share → Add to Home Screen.
 ## Data
 - tools/build_data.py builds data.js from TCGplayer market prices (tcgcsv.com export, 2026-11-16)
   and TCGplayer Authentication Center pull rates (via pullsim.com).
-- tools/fetch_imgs.sh downloads card thumbnails into img/.
+- Card art in `img/` is 600px-wide WebP (from TCGplayer 1000×1000 product photos). Binder thumbs live in `img/thumbs/` (200px). Images lazy-load and are cached on first view; they are not precached.
 - tools/ev.py prints expected value per pack.
 - Saves collection + stats in localStorage (key `packvault.v1`), per device/browser.
 

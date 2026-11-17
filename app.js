@@ -371,10 +371,11 @@ function startRip(dir = 'ltr') {
 }
 
 /* ---------- reveal ---------- */
-function cardSrc(c) {
+function cardSrc(c, kind = 'full') {
   if (c.k === 'en') return `img/energy/${c.eid || c.pid}.webp`;
   if (c.k === 'code') return '';
-  return `img/${c.pid}.jpg`;
+  if (kind === 'thumb') return `img/thumbs/${c.pid}.webp`;
+  return `img/${c.pid}.webp`;
 }
 function cardFace(c) {
   if (c.k === 'code') {
@@ -384,13 +385,17 @@ function cardFace(c) {
   return `<img src="${src}" alt="" data-n="${esc(c.name)}" data-r="${RAR[c.k].n}" onerror="ppFallback(this)">`;
 }
 window.ppFallback = img => {
-  if (img.src && img.src.includes('.webp')) {
-    img.onerror = () => {
-      const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d);
-    };
-    img.src = img.src.replace('.webp', '.jpg');
+  if (img.dataset.fb === '1') {
+    const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d);
     return;
   }
+  // full art missing → try the 200px thumb, then a CSS stand-in
+  if (img.src && /\/img\/\d+\.webp/.test(img.src)) {
+    img.dataset.fb = '1';
+    img.src = img.src.replace('/img/', '/img/thumbs/');
+    return;
+  }
+  img.dataset.fb = '1';
   const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d);
 };
 function markHint() {
@@ -444,7 +449,7 @@ function advance() {
     el.classList.remove('hint-glow');
     const m = document.createElement('div'); m.className = 'mini' + (HIT.has(c.k) || c.v >= 5 ? ' hit' : '');
     if (c.k === 'code') m.innerHTML = `<div class="code-mini">CODE</div>`;
-    else m.innerHTML = `<img src="${cardSrc(c)}" alt="" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg')">`;
+    else m.innerHTML = `<img src="${cardSrc(c, 'thumb')}" alt="" loading="lazy" onerror="ppFallback(this)">`;
     $('#strip').appendChild(m);
     idx++; cur.state = 'back';
     markHint();
@@ -475,7 +480,7 @@ function showSummary() {
   $('#sumNote').textContent = S.packs.length > 1
     ? `After ${S.packs.length} packs you've spent ${fmt(t.spent)} and pulled ${fmt(t.worth)} in cards (${fmtS(t.net)}).`
     : (S.resale ? 'Counting cards at 65% of their price, which is closer to what you would get if you sold them.' : 'Card values are what they are "worth" on paper. Selling usually gets about 65%.');
-  $('#sumCards').innerHTML = cards.map(c => `<div class="mini r-${c.k}">${c.k === 'code' ? '<div class="code-mini">CODE</div>' : `<img src="${cardSrc(c)}" alt="" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg')">`}<span>${c.k === 'code' ? '—' : fmt(c.v * f)}</span></div>`).join('');
+  $('#sumCards').innerHTML = cards.map(c => `<div class="mini r-${c.k}">${c.k === 'code' ? '<div class="code-mini">CODE</div>' : `<img src="${cardSrc(c, 'thumb')}" alt="" loading="lazy" onerror="ppFallback(this)">`}<span>${c.k === 'code' ? '—' : fmt(c.v * f)}</span></div>`).join('');
   renderHeader(0);
   const can = balance() >= priceOf(s);
   $('#againBtn').disabled = !can; $('#againBtn').textContent = can ? `Open another · ${fmt(priceOf(s))}` : 'Out of money';
@@ -612,7 +617,7 @@ function renderBinder() {
   $('#binderCount').innerHTML = `${tc} cards<br>${all.length} different`;
   const shown = list.slice(0, 300);
   $('#binder').innerHTML = shown.length ? shown.map(c => `<div class="bcard ${HIT.has(c.k) || c.v >= 5 ? 'hit' : ''}" title="${esc(c.name)} · ${RAR[c.k].n}">
-      <img src="${cardSrc(c)}" alt="${esc(c.name)}" loading="lazy" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg'); else this.style.display='none'">
+      <img src="${cardSrc(c, 'thumb')}" alt="${esc(c.name)}" loading="lazy" onerror="ppFallback(this)">
       ${c.n > 1 ? `<div class="cnt">×${c.n}</div>` : ''}
       <div class="bv2"><span>${RAR[c.k].n.split(' ').map(w => w[0]).join('')}</span><b>${fmt(c.v * factor())}</b></div></div>`).join('')
     : `<div class="empty-msg">${all.length ? 'No cards match these filters' : 'Rip a pack and your cards land here'}</div>`;
