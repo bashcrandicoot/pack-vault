@@ -1,6 +1,6 @@
 /* Pack Vault service worker: precache app shell, cache card images as they're seen. */
-const V = 'packvault-v1';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const V = 'packvault-v2';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'img/packs/pfl.webp', 'img/packs/asc.webp', 'img/packs/pre.webp', 'img/packs/cri.webp'];
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(V);

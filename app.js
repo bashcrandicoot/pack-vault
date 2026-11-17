@@ -126,16 +126,23 @@ function applyTheme(s) {
   document.documentElement.style.setProperty('--a1', s.theme[0]);
   document.documentElement.style.setProperty('--a2', s.theme[1]);
 }
+const packSrc = (id, ext = 'webp') => `img/packs/${id}.${ext}`;
+function armPackImg(img, id, alt) {
+  img.alt = alt || '';
+  img.onerror = () => { if (!img.src.endsWith('.jpg')) img.src = packSrc(id, 'jpg'); };
+  img.src = packSrc(id);
+}
+SETS.forEach(s => { const i = new Image(); i.onerror = () => { i.src = packSrc(s.id, 'jpg'); }; i.src = packSrc(s.id); });
 function renderPicker() {
   $('#setPicker').innerHTML = SETS.map(s =>
-    `<button class="set-chip ${s.id === S.set ? 'on' : ''}" data-s="${s.id}"><b>${s.name}</b><small>${fmt(priceOf(s))} · avg pull ${fmt(EV[s.id] * factor())}</small></button>`).join('');
+    `<button class="set-chip ${s.id === S.set ? 'on' : ''}" data-s="${s.id}"><img class="set-thumb" src="${packSrc(s.id)}" alt="" onerror="this.onerror=null;this.src='img/packs/${s.id}.jpg'"><span><b>${s.name}</b><small>${fmt(priceOf(s))} · avg pull ${fmt(EV[s.id] * factor())}</small></span></button>`).join('');
   $$('.set-chip').forEach(b => b.onclick = () => { if (busy) return; S.set = b.dataset.s; save(); SFX.tick(); buzz(8); renderPack(); renderPicker(); });
 }
 function renderPack() {
   const s = setById(S.set); applyTheme(s);
-  const chase = s.pools.sir ? s.pools.sir[0] : s.pools.ur[0];
-  $('#packArt').style.backgroundImage = `url(img/${chase[3]}.jpg)`;
-  $('#packCode').textContent = s.code; $('#packName').textContent = s.name;
+  const alt = `${s.name} booster pack`;
+  armPackImg($('#packPhoto'), s.id, alt);
+  armPackImg($('#packPhotoTop'), s.id, '');
   const p = priceOf(s), e = EV[s.id] * factor();
   $('#packPrice').textContent = fmt(p); $('#packEv').textContent = fmt(e);
   $('#evLine').innerHTML = e < p
@@ -144,35 +151,113 @@ function renderPack() {
   const can = balance() >= p;
   $('#ripBtn').disabled = !can;
   $('#ripBtn').textContent = can ? `Rip it open · ${fmt(p)}` : 'Not enough money';
-  $('#hint').textContent = can ? 'Swipe across the top to rip ➜' : 'Out of money! That’s how packs work. Add allowance in ⚙️';
+  $('#hint').textContent = can ? 'Swipe the top strip to tear it open' : 'Out of money! That’s how packs work. Add allowance in ⚙️';
 }
 
 /* ---------- tearing ---------- */
 let busy = false, cur = null, idx = 0;
-const pack = $('#pack'), top = $('#packTop'), line = $('#tearline');
+const pack = $('#pack'), packTop = $('#packTop'), packInner = $('#packInner');
+const TEAR_DONE = .70;
 let drag = null;
+function clamp01(n) { return Math.max(0, Math.min(1, n)); }
+function tearClip(progress, dir) {
+  const x = progress * 100;
+  const zig = i => (i % 2 === 0 ? 2.6 : -1.8);
+  const pts = [];
+  if (dir === 'rtl') {
+    pts.push('-6% 0%', '-6% 100%');
+    for (let i = 10; i >= 0; i--) pts.push(`${(x + zig(i)).toFixed(2)}% ${(i * 10).toFixed(2)}%`);
+  } else {
+    for (let i = 0; i <= 10; i++) pts.push(`${(x + zig(i)).toFixed(2)}% ${(i * 10).toFixed(2)}%`);
+    pts.push('106% 100%', '106% 0%');
+  }
+  return `polygon(${pts.join(',')})`;
+}
+function applyTear(progress, dir) {
+  pack.classList.toggle('tear-ltr', dir === 'ltr');
+  pack.classList.toggle('tear-rtl', dir === 'rtl');
+  packTop.classList.remove('spring');
+  packTop.style.clipPath = progress <= 0.001 ? 'none' : tearClip(progress, dir);
+  const lift = progress * 7;
+  const rot = (dir === 'rtl' ? -1 : 1) * progress * 3;
+  packTop.style.transform = `translateY(-${lift}px) rotate(${rot}deg)`;
+}
+function tiltPack(e, r) {
+  const nx = (e.clientX - r.left) / r.width - .5;
+  const ny = (e.clientY - r.top) / r.height - .5;
+  packInner.style.transform = `rotateY(${(nx * 14).toFixed(2)}deg) rotateX(${(-ny * 9).toFixed(2)}deg)`;
+  pack.style.setProperty('--shine', `${(50 + nx * 80).toFixed(1)}%`);
+}
+function clearTilt() {
+  packInner.style.transition = 'transform .35s ease';
+  packInner.style.transform = '';
+  pack.style.removeProperty('--shine');
+  setTimeout(() => { packInner.style.transition = ''; }, 360);
+}
+function resetTearVisuals() {
+  packTop.classList.remove('spring');
+  packTop.style.clipPath = '';
+  packTop.style.transform = '';
+  packTop.style.opacity = '';
+  pack.classList.remove('torn', 'gone', 'held', 'tearing', 'tear-ltr', 'tear-rtl');
+  packInner.style.transform = '';
+  packInner.style.transition = '';
+  pack.style.removeProperty('--shine');
+}
+function springBack(dir) {
+  packTop.classList.add('spring');
+  packTop.style.clipPath = dir ? tearClip(0, dir) : 'none';
+  packTop.style.transform = '';
+  pack.classList.remove('tearing');
+  clearTilt();
+  const d = dir;
+  setTimeout(() => {
+    packTop.classList.remove('spring');
+    packTop.style.clipPath = '';
+    pack.classList.remove('held', 'tear-ltr', 'tear-rtl');
+  }, 360);
+  drag = null;
+}
 pack.addEventListener('pointerdown', e => {
   if (busy) return;
   const r = pack.getBoundingClientRect();
-  if (e.clientY - r.top > r.height * .42) return; // must start on upper part
-  drag = {x0: e.clientX, r, last: 0}; pack.setPointerCapture(e.pointerId); ac();
+  const y = (e.clientY - r.top) / r.height;
+  pack.setPointerCapture(e.pointerId);
+  pack.classList.add('held');
+  ac();
+  tiltPack(e, r);
+  // Tear only starts on the top strip (~15%), with a little slop for fat fingers.
+  drag = {x0: e.clientX, r, last: 0, dir: null, tearing: y <= 0.22};
+  if (drag.tearing) pack.classList.add('tearing');
 });
 pack.addEventListener('pointermove', e => {
   if (!drag) return;
-  const p = Math.max(0, Math.min(1, (e.clientX - drag.r.left) / drag.r.width));
-  const prog = Math.max(drag.last, p * (e.clientX > drag.x0 ? 1 : 0));
-  line.style.width = (prog * 100) + '%';
+  const r = pack.getBoundingClientRect();
+  drag.r = r;
+  tiltPack(e, r);
+  if (!drag.tearing) return;
+  const p = clamp01((e.clientX - r.left) / r.width);
+  if (!drag.dir) {
+    if (Math.abs(e.clientX - drag.x0) < 10) return;
+    drag.dir = e.clientX >= drag.x0 ? 'ltr' : 'rtl';
+  }
+  const prog = drag.dir === 'ltr' ? p : (1 - p);
+  applyTear(prog, drag.dir);
   if (Math.floor(prog * 10) > Math.floor(drag.last * 10)) { SFX.tick(); buzz(6); }
   drag.last = prog;
-  if (prog > .82) { drag = null; startRip(); }
+  if (prog >= TEAR_DONE) { const dir = drag.dir; drag = null; startRip(dir); }
 });
-const endDrag = () => { if (drag) { line.style.transition = 'width .3s'; line.style.width = '0'; setTimeout(() => line.style.transition = '', 300); drag = null; } };
+const endDrag = () => {
+  if (!drag) return;
+  if (drag.tearing && drag.last < TEAR_DONE) springBack(drag.dir);
+  else { clearTilt(); pack.classList.remove('held'); drag = null; }
+};
 pack.addEventListener('pointerup', endDrag); pack.addEventListener('pointercancel', endDrag);
-$('#ripBtn').onclick = () => { if (!busy) { ac(); line.style.transition = 'width .35s ease-out'; line.style.width = '100%'; setTimeout(() => { line.style.transition = ''; startRip(); }, 360); } };
+$('#ripBtn').onclick = () => { if (!busy) { ac(); startRip('ltr'); } };
 
-function startRip() {
+function startRip(dir = 'ltr') {
   const s = setById(S.set), cost = priceOf(s);
-  if (balance() < cost - 1e-9) { line.style.width = '0'; toast('Not enough money for this pack'); pack.classList.add('shake'); setTimeout(() => pack.classList.remove('shake'), 400); return; }
+  if (balance() < cost - 1e-9) { springBack(dir); toast('Not enough money for this pack'); pack.classList.add('shake'); setTimeout(() => pack.classList.remove('shake'), 400); return; }
   busy = true; document.body.classList.add('ripping');
   const cards = openPack(s);
   const value = +cards.reduce((t, c) => t + c.v, 0).toFixed(2);
@@ -187,7 +272,10 @@ function startRip() {
   save();
   cur = {s, cards, cost, value, pulled: 0, revealedVal: 0};
   SFX.tear(); buzz([20, 30, 40]);
-  pack.classList.add('torn');
+  packTop.classList.remove('spring');
+  packTop.style.transform = ''; // let the CSS fly-off take over, keep the torn clip
+  pack.classList.add('torn', dir === 'rtl' ? 'tear-rtl' : 'tear-ltr');
+  pack.classList.remove('held');
   renderHeader(value); // shows balance after paying, before cards are counted
   setTimeout(() => { pack.classList.add('gone'); }, 450);
   setTimeout(beginReveal, 900);
@@ -273,7 +361,7 @@ function showSummary() {
 function resetStage() {
   cur = null; busy = false; document.body.classList.remove('ripping');
   $('#summary').classList.add('hidden'); $('#reveal').classList.add('hidden'); $('#packWrap').classList.remove('hidden');
-  pack.classList.remove('torn', 'gone'); line.style.width = '0';
+  resetTearVisuals();
   renderPack(); renderPicker(); renderHeader();
 }
 $('#doneBtn').onclick = resetStage;

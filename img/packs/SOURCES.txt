@@ -1,0 +1,26 @@
+Pack wrapper photos used in Pack Vault (front of the sealed single booster pack).
+Downloaded Nov 16, 2026 from TCGplayer product images (1000px fit-in).
+Card and pack art © The Pokémon Company / Nintendo, via TCGplayer. Not affiliated.
+
+pfl  Phantasmal Flames
+     TCGplayer product 654144 — "Phantasmal Flames Booster Pack"
+     https://www.tcgplayer.com/product/654144/pokemon-me02-phantasmal-flames-phantasmal-flames-booster-pack
+     https://product-images.tcgplayer.com/fit-in/1000x1000/654144.jpg
+
+asc  Ascended Heroes
+     TCGplayer product 672434 — "Ascended Heroes Booster Pack"
+     https://www.tcgplayer.com/product/672434/pokemon-me-ascended-heroes-ascended-heroes-booster-pack
+     https://product-images.tcgplayer.com/fit-in/1000x1000/672434.jpg
+
+pre  Prismatic Evolutions
+     TCGplayer product 593294 — "Prismatic Evolutions Booster Pack"
+     https://www.tcgplayer.com/product/593294/pokemon-sv-prismatic-evolutions-prismatic-evolutions-booster-pack
+     https://product-images.tcgplayer.com/fit-in/1000x1000/593294.jpg
+
+cri  Chaos Rising
+     TCGplayer product 684446 — "Chaos Rising Booster Pack"
+     https://www.tcgplayer.com/product/684446/pokemon-me04-chaos-rising-chaos-rising-booster-pack
+     https://product-images.tcgplayer.com/fit-in/1000x1000/684446.jpg
+
+All four had a single-pack product photo; no ETB crop was needed.
+Images were resized to 328×600 and saved as WebP (q80) plus JPEG (q88).

@@ -8,7 +8,7 @@ Mobile-first, installable, works offline. No build step, no backend.
 
 ## Host it (any static host)
 Upload the whole folder (index.html, style.css, app.js, data.js, sw.js, manifest.webmanifest,
-precache-imgs.json, icons/, img/). Netlify Drop, Cloudflare Pages, GitHub Pages and Vercel all work.
+precache-imgs.json, icons/, img/, img/packs/). Netlify Drop, Cloudflare Pages, GitHub Pages and Vercel all work.
 On the phone: open the URL in Safari → Share → Add to Home Screen.
 
 ## Data
@@ -17,3 +17,5 @@ On the phone: open the URL in Safari → Share → Add to Home Screen.
 - tools/fetch_imgs.sh downloads card thumbnails into img/.
 - tools/ev.py prints expected value per pack.
 - Saves collection + stats in localStorage (key `packvault.v1`), per device/browser.
+
+Pack wrapper photos in `img/packs/` are the TCGplayer sealed booster-pack product images (see img/packs/SOURCES.txt).
