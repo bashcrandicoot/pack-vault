@@ -1,0 +1,10 @@
+Pokemon Solid (pokemon-solid.woff2 / .ttf)
+- Free fan font commonly attributed to IPBP / Fontsaurus, listed on FontSpace
+  as Creative Commons Attribution (personal and commercial use with credit)
+  and distributed on DaFont as "Pokemon Solid" / "Pokemon Hollow".
+- Downloaded from DaFont (https://www.dafont.com/pokemon.font) on 2026-11-16
+  and subset to Basic Latin + é / É / ’ for the "Zara's Poképacks" title.
+- This is a fan typeface in the style of the official Pokémon wordmark; the
+  Pokémon name and logo are trademarks of Nintendo / Creatures / Game Freak /
+  The Pokémon Company. This app is an unofficial fan project and is not
+  affiliated with them.

@@ -1,6 +1,6 @@
-/* Pack Vault service worker: precache app shell, cache card images as they're seen. */
-const V = 'packvault-v2';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'img/packs/pfl.webp', 'img/packs/asc.webp', 'img/packs/pre.webp', 'img/packs/cri.webp'];
+/* Zara's Poképacks service worker: precache app shell, cache card images as they're seen. */
+const V = 'packvault-v3';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'pack-model.js', 'fonts/pokemon-solid.woff2', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'img/packs/pfl.webp', 'img/packs/asc.webp', 'img/packs/pre.webp', 'img/packs/cri.webp', 'img/ui/card-back.webp', 'img/ui/sparkle.png', 'img/energy/grass.webp', 'img/energy/fire.webp', 'img/energy/water.webp', 'img/energy/lightning.webp', 'img/energy/psychic.webp', 'img/energy/fighting.webp', 'img/energy/darkness.webp', 'img/energy/metal.webp'];
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(V);

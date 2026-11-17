@@ -11,13 +11,16 @@ const fmt = n => (n < 0 ? '−$' : '$') + Math.abs(n).toFixed(2);
 const fmtS = n => (n > 0 ? '+' : '') + fmt(n);
 
 const RAR = {
-  c:{n:'Common',o:0}, u:{n:'Uncommon',o:1}, r:{n:'Rare (holo)',o:2}, rev:{n:'Reverse Holo',o:1.5},
+  c:{n:'Common',o:0}, u:{n:'Uncommon',o:1}, en:{n:'Basic Energy',o:0}, code:{n:'Code Card',o:-1},
+  r:{n:'Rare (holo)',o:2}, rev:{n:'Reverse Holo',o:1.5},
   pb:{n:'Poké Ball Foil',o:2.5}, ace:{n:'ACE SPEC Rare',o:3}, dr:{n:'Double Rare',o:4}, ur:{n:'Ultra Rare',o:5},
   mar:{n:'Mega Attack Rare',o:5.5}, ir:{n:'Illustration Rare',o:6}, mb:{n:'Master Ball Foil',o:6.5},
   sir:{n:'Special Illustration Rare',o:8}, hr:{n:'Hyper Rare',o:9}, mhr:{n:'Mega Hyper Rare',o:10}
 };
 const HIT = new Set(['ir','mb','sir','hr','mhr','mar']);
+const HINT = new Set(['dr','ur','ace','ir','mb','sir','hr','mhr','mar']);
 const BIG = new Set(['sir','hr','mhr']);
+const FOIL = {rev:'body', pb:'body', r:'art', dr:'art', ur:'full', ace:'full', ir:'full', mb:'full', sir:'full', hr:'full', mhr:'full', mar:'full'};
 
 /* ---------- state ---------- */
 const def = () => ({start:100, topups:0, resale:false, priceMode:'market', muted:false, haptics:true, set:'pfl', packs:[], coll:{}});
@@ -37,45 +40,8 @@ const balance = () => S.start + S.topups + totals().net;
 /* ---------- RNG + pull model ---------- */
 const rnd = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; };
 const pick = arr => arr[Math.floor(rnd() * arr.length)];
-const mean = arr => arr && arr.length ? arr.reduce((t, c) => t + c[2], 0) / arr.length : 0;
-// Weighted choice; probabilities in %, remainder -> fallback pool.
-function roll(table, fallback) {
-  let x = rnd() * 100;
-  for (const [k, p] of table) { if (x < p) return k; x -= p; }
-  return fallback;
-}
-// Slot model for modern (Scarlet & Violet / Mega Evolution) 10-card packs:
-// 4 common, 3 uncommon, reverse-holo slot, "hit" reverse slot (IR/SIR/MHR or reverse holo), rare slot (Rare/DR/UR/MAR).
-function slots(s) {
-  const r = s.rates;
-  const out = [];
-  for (let i = 0; i < 4; i++) out.push(['c']);
-  for (let i = 0; i < 3; i++) out.push(['u']);
-  if (s.id === 'pre') {
-    out.push([[['ace', r.ace], ['pb', r.pb]], 'rev']);
-    out.push([[['hr', r.hr], ['sir', r.sir], ['mb', r.mb]], 'rev']);
-  } else {
-    out.push(['rev']);
-    out.push([[['mhr', r.mhr], ['sir', r.sir], ['ir', r.ir]].filter(x => x[1]), 'rev']);
-  }
-  out.push([[['ur', r.ur], ['mar', r.mar], ['dr', r.dr]].filter(x => x[1]), 'r']);
-  return out;
-}
-function openPack(s) {
-  return slots(s).map(sl => {
-    const key = sl.length === 1 ? sl[0] : roll(sl[0], sl[1]);
-    const c = pick(s.pools[key]);
-    return {set: s.id, k: key, name: c[0], num: c[1], v: c[2], pid: c[3]};
-  });
-}
-function ev(s) {
-  return slots(s).reduce((t, sl) => {
-    if (sl.length === 1) return t + mean(s.pools[sl[0]]);
-    let rest = 100, sum = 0;
-    for (const [k, p] of sl[0]) { sum += p / 100 * mean(s.pools[k]); rest -= p; }
-    return t + sum + rest / 100 * mean(s.pools[sl[1]]);
-  }, 0);
-}
+const Model = PP_createModel(rnd);
+const {openPack, ev, mean} = Model;
 const EV = Object.fromEntries(SETS.map(s => [s.id, ev(s)]));
 window.PP_EV = EV;
 
@@ -133,25 +99,144 @@ function armPackImg(img, id, alt) {
   img.src = packSrc(id);
 }
 SETS.forEach(s => { const i = new Image(); i.onerror = () => { i.src = packSrc(s.id, 'jpg'); }; i.src = packSrc(s.id); });
+function returnLine(s) {
+  const p = priceOf(s), e = EV[s.id] * factor(), cents = Math.round(e / p * 100);
+  let html = `On average you get back <b>${cents}¢</b> for every $1 you spend on this pack.`;
+  if (cents >= 100) html += ` That’s about even on paper, but selling usually gets ~65%.`;
+  return {p, e, cents, html};
+}
+function updateCarouselMeta(s) {
+  applyTheme(s);
+  const {p, e, html} = returnLine(s);
+  const name = $('#carName'); if (name) name.textContent = s.name;
+  const cp = $('#carPrice'); if (cp) cp.textContent = fmt(p);
+  const ce = $('#carEv'); if (ce) ce.textContent = fmt(e);
+  const evl = $('#evLine'); if (evl) evl.innerHTML = html;
+  $$('.car-dot').forEach(d => d.classList.toggle('on', d.dataset.s === s.id));
+  const can = balance() >= p;
+  const hint = $('#carHint');
+  if (hint) hint.textContent = can ? 'Tap the pack in the middle to pick it up' : 'Out of money! Add allowance in ⚙️';
+  const btn = $('#pickBtn');
+  if (btn) { btn.disabled = !can; btn.textContent = can ? 'Pick up this pack' : 'Not enough money'; }
+}
+let carRaf = 0, carBound = false;
+function scrollCarouselTo(id, smooth) {
+  const track = $('#carousel'), el = track && track.querySelector(`.car-item[data-s="${id}"]`);
+  if (!track || !el) return;
+  const left = el.offsetLeft - (track.clientWidth - el.offsetWidth) / 2;
+  track.scrollTo({left: Math.max(0, left), behavior: smooth ? 'smooth' : 'auto'});
+}
+function syncCarousel(fromUser) {
+  const track = $('#carousel');
+  if (!track) return;
+  const mid = track.getBoundingClientRect().left + track.clientWidth / 2;
+  let best = null, bestD = 1e9;
+  $$('.car-item').forEach(el => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const d = Math.abs(cx - mid);
+    if (d < bestD) { bestD = d; best = el; }
+    el.classList.toggle('is-left', cx < mid);
+    el.classList.toggle('is-right', cx > mid);
+  });
+  $$('.car-item').forEach(el => {
+    const on = el === best;
+    el.classList.toggle('is-center', on);
+    if (on) { el.classList.remove('is-left', 'is-right'); }
+  });
+  if (!best) return;
+  if (best.dataset.s !== S.set) {
+    S.set = best.dataset.s; save();
+    if (fromUser) { SFX.tick(); buzz(8); }
+  }
+  updateCarouselMeta(setById(S.set));
+}
+function bindCarousel() {
+  const track = $('#carousel');
+  if (!track || carBound) {
+    // rebind clicks after rebuild
+  }
+  track.onscroll = () => {
+    if (carRaf) return;
+    carRaf = requestAnimationFrame(() => { carRaf = 0; syncCarousel(true); });
+  };
+  $$('.car-item').forEach(btn => {
+    let holdTimer, sx, sy, moved;
+    const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; btn.classList.remove('holding'); };
+    btn.onpointerdown = e => {
+      if (busy) return;
+      sx = e.clientX; sy = e.clientY; moved = false;
+      if (btn.classList.contains('is-center')) {
+        btn.classList.add('holding');
+        holdTimer = setTimeout(() => { holdTimer = null; btn.classList.remove('holding'); pickCenteredPack(); }, 420);
+      }
+    };
+    btn.onpointermove = e => {
+      if (Math.abs((e.clientX || 0) - sx) > 8 || Math.abs((e.clientY || 0) - sy) > 8) { moved = true; cancelHold(); }
+    };
+    btn.onpointerup = e => {
+      const wasHold = btn.classList.contains('holding') || holdTimer;
+      cancelHold();
+      if (busy || moved) return;
+      if (btn.classList.contains('is-center') && btn.dataset.s === S.set) pickCenteredPack();
+      else scrollCarouselTo(btn.dataset.s, true);
+    };
+    btn.onpointercancel = cancelHold;
+    btn.onclick = e => e.preventDefault();
+  });
+  $$('.car-dot').forEach(d => d.onclick = () => { if (!busy) scrollCarouselTo(d.dataset.s, true); });
+}
 function renderPicker() {
-  $('#setPicker').innerHTML = SETS.map(s =>
-    `<button class="set-chip ${s.id === S.set ? 'on' : ''}" data-s="${s.id}"><img class="set-thumb" src="${packSrc(s.id)}" alt="" onerror="this.onerror=null;this.src='img/packs/${s.id}.jpg'"><span><b>${s.name}</b><small>${fmt(priceOf(s))} · avg pull ${fmt(EV[s.id] * factor())}</small></span></button>`).join('');
-  $$('.set-chip').forEach(b => b.onclick = () => { if (busy) return; S.set = b.dataset.s; save(); SFX.tick(); buzz(8); renderPack(); renderPicker(); });
+  const track = $('#carousel');
+  if (!track) return;
+  track.innerHTML = SETS.map(s =>
+    `<button type="button" class="car-item" data-s="${s.id}" aria-label="${esc(s.name)}">
+      <div class="car-pack">
+        <img class="car-photo" src="${packSrc(s.id)}" alt="" onerror="this.onerror=null;this.src='img/packs/${s.id}.jpg'">
+        <div class="car-foil"></div>
+      </div>
+    </button>`).join('');
+  const dots = $('#carDots');
+  if (dots) dots.innerHTML = SETS.map(s => `<button type="button" class="car-dot${s.id === S.set ? ' on' : ''}" data-s="${s.id}" aria-label="${esc(s.name)}"></button>`).join('');
+  bindCarousel();
+  updateCarouselMeta(setById(S.set));
+  requestAnimationFrame(() => { scrollCarouselTo(S.set, false); syncCarousel(false); });
+}
+function pickCenteredPack() {
+  if (busy) return;
+  if ($('#carouselMode') && $('#carouselMode').classList.contains('hidden')) return;
+  const s = setById(S.set);
+  if (balance() < priceOf(s) - 1e-9) { toast('Not enough money for this pack'); buzz(20); return; }
+  SFX.tick(); buzz([16, 20, 30]);
+  $('#carouselMode').classList.add('hidden');
+  $('#tearMode').classList.remove('hidden');
+  renderPack();
+  armFoil();
+}
+function showCarousel() {
+  if (busy) return;
+  $('#tearMode').classList.add('hidden');
+  $('#carouselMode').classList.remove('hidden');
+  resetTearVisuals();
+  renderPicker();
+  renderHeader();
 }
 function renderPack() {
   const s = setById(S.set); applyTheme(s);
   const alt = `${s.name} booster pack`;
-  armPackImg($('#packPhoto'), s.id, alt);
-  armPackImg($('#packPhotoTop'), s.id, '');
-  const p = priceOf(s), e = EV[s.id] * factor();
-  $('#packPrice').textContent = fmt(p); $('#packEv').textContent = fmt(e);
-  $('#evLine').innerHTML = e < p
-    ? `On average you get back <b>${Math.round(e / p * 100)}¢</b> for every $1 you spend on this pack.`
-    : `At this price the average pull is about even on paper, but selling cards usually gets ~65%, so you'd still lose.`;
+  const photo = $('#packPhoto'), top = $('#packPhotoTop');
+  if (photo) armPackImg(photo, s.id, alt);
+  if (top) armPackImg(top, s.id, '');
+  const {p, e, html} = returnLine(s);
+  const pp = $('#packPrice'); if (pp) pp.textContent = fmt(p);
+  const pe = $('#packEv'); if (pe) pe.textContent = fmt(e);
+  const te = $('#tearEvLine'); if (te) te.innerHTML = html;
+  const evl = $('#evLine'); if (evl) evl.innerHTML = html;
   const can = balance() >= p;
-  $('#ripBtn').disabled = !can;
-  $('#ripBtn').textContent = can ? `Rip it open · ${fmt(p)}` : 'Not enough money';
-  $('#hint').textContent = can ? 'Swipe the top strip to tear it open' : 'Out of money! That’s how packs work. Add allowance in ⚙️';
+  const rip = $('#ripBtn');
+  if (rip) { rip.disabled = !can; rip.textContent = can ? `Rip it open · ${fmt(p)}` : 'Not enough money'; }
+  const hint = $('#hint');
+  if (hint) hint.textContent = can ? 'Swipe the top strip to tear it open' : 'Out of money! That’s how packs work. Add allowance in ⚙️';
 }
 
 /* ---------- tearing ---------- */
@@ -254,6 +339,9 @@ const endDrag = () => {
 };
 pack.addEventListener('pointerup', endDrag); pack.addEventListener('pointercancel', endDrag);
 $('#ripBtn').onclick = () => { if (!busy) { ac(); startRip('ltr'); } };
+$('#pickBtn') && ($('#pickBtn').onclick = () => { if (!busy) pickCenteredPack(); });
+$('#backPacks') && ($('#backPacks').onclick = () => showCarousel());
+
 
 function startRip(dir = 'ltr') {
   const s = setById(S.set), cost = priceOf(s);
@@ -265,6 +353,7 @@ function startRip(dir = 'ltr') {
   const rec = {t: Date.now(), set: s.id, cost, value, cards: cards.map(c => [c.k, c.pid, c.v, c.name])};
   S.packs.push(rec);
   for (const c of cards) {
+    if (c.k === 'code') continue;
     const k = `${c.set}|${c.k}|${c.pid}`;
     const e = S.coll[k] || (S.coll[k] = {set: c.set, k: c.k, pid: c.pid, name: c.name, num: c.num, v: c.v, n: 0, t: 0});
     e.n++; e.t = Date.now(); e.v = c.v;
@@ -282,28 +371,56 @@ function startRip(dir = 'ltr') {
 }
 
 /* ---------- reveal ---------- */
-function cardFace(c) {
-  return `<img src="img/${c.pid}.jpg" alt="" data-n="${esc(c.name)}" data-r="${RAR[c.k].n}" onerror="ppFallback(this)">`;
+function cardSrc(c) {
+  if (c.k === 'en') return `img/energy/${c.eid || c.pid}.webp`;
+  if (c.k === 'code') return '';
+  return `img/${c.pid}.jpg`;
 }
-window.ppFallback = img => { const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d); };
+function cardFace(c) {
+  if (c.k === 'code') {
+    return `<div class="code-face" data-n="Code Card" data-r="Code Card"><div class="code-kicker">Pokémon TCG Live</div><div class="code-title">Code Card</div><div class="code-set">${esc(c.num || '')}</div><div class="code-note">Redeem in the official app. Not sold. Worth $0.</div></div>`;
+  }
+  const src = cardSrc(c);
+  return `<img src="${src}" alt="" data-n="${esc(c.name)}" data-r="${RAR[c.k].n}" onerror="ppFallback(this)">`;
+}
+window.ppFallback = img => {
+  if (img.src && img.src.includes('.webp')) {
+    img.onerror = () => {
+      const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d);
+    };
+    img.src = img.src.replace('.webp', '.jpg');
+    return;
+  }
+  const d = document.createElement('div'); d.className = 'fallback'; d.innerHTML = `<div class="fb-n">${esc(img.dataset.n || '')}</div><div class="fb-r">${esc(img.dataset.r || '')}</div>`; img.replaceWith(d);
+};
+function markHint() {
+  $$('#deck .card').forEach((el, i) => {
+    const c = cur && cur.cards[i];
+    el.classList.toggle('hint-glow', i === idx && cur && cur.state === 'back' && c && HINT.has(c.k));
+  });
+}
 function beginReveal() {
   $('#packWrap').classList.add('hidden'); $('#reveal').classList.remove('hidden');
-  $('#tPaid').textContent = fmt(cur.cost); $('#tPulled').textContent = '$0.00'; $('#tCount').textContent = '0/10';
+  const n = cur.cards.length;
+  $('#tPaid').textContent = fmt(cur.cost); $('#tPulled').textContent = '$0.00'; $('#tCount').textContent = '0/' + n;
   $('#strip').innerHTML = '';
   const deck = $('#deck'); deck.innerHTML = '';
   cur.cards.forEach((c, i) => {
     const el = document.createElement('div');
-    el.className = `card r-${c.k} ${HIT.has(c.k) || c.v >= 10 ? 'hit' : ''}`;
+    const foil = FOIL[c.k];
+    el.className = `card r-${c.k} ${HIT.has(c.k) || c.v >= 10 ? 'hit' : ''}${HINT.has(c.k) ? ' is-hit' : ''}`;
     el.style.zIndex = 100 - i;
     el.style.transform = `translateY(${i * 1.5}px) rotate(${(i % 2 ? 1 : -1) * i * .3}deg)`;
-    el.innerHTML = `<div class="glow"></div><div class="back"></div><div class="face">${cardFace(c)}<div class="holo"></div>
+    el.innerHTML = `<div class="glow"></div><div class="back"></div><div class="face">${cardFace(c)}${foil ? `<div class="foil foil-${foil}"></div>` : ''}
       <div class="badge">${RAR[c.k].n}</div>
-      <div class="ribbon"><div><div class="nm">${esc(c.name)}</div><div class="rt">${c.num || ''}</div></div><div class="vl">${fmt(c.v * factor())}</div></div></div>`;
+      <div class="ribbon"><div><div class="nm">${esc(c.name)}</div><div class="rt">${c.num || ''}</div></div><div class="vl">${c.k === 'code' ? '—' : fmt(c.v * factor())}</div></div></div>`;
     el.onclick = () => advance();
     deck.appendChild(el);
     if (i === 0) el.animate([{transform: 'translateY(80px) scale(.8)', opacity: 0}, {transform: el.style.transform, opacity: 1}], {duration: 450, easing: 'cubic-bezier(.2,.9,.3,1.2)'});
   });
   idx = 0; cur.state = 'back';
+  markHint();
+  armFoil();
   $('#tapNote').textContent = 'Tap the card to flip';
 }
 function advance() {
@@ -311,29 +428,35 @@ function advance() {
   const els = $$('#deck .card'), el = els[idx], c = cur.cards[idx];
   if (!el) return;
   if (cur.state === 'back') {
+    const tier = pullTier(c.v);
+    if (tier && !reduceMotion()) el.classList.add('slowmo-' + tier);
     el.style.transform = ''; el.classList.add('flipped'); cur.state = 'face';
-    cur.revealedVal += c.v; $('#tPulled').textContent = fmt(cur.revealedVal * factor()); $('#tCount').textContent = `${idx + 1}/10`;
+    cur.revealedVal += c.v; $('#tPulled').textContent = fmt(cur.revealedVal * factor()); $('#tCount').textContent = `${idx + 1}/${cur.cards.length}`;
     renderHeader(cur.value - cur.revealedVal);
     SFX.flip(); buzz(10);
-    if (BIG.has(c.k) || c.v >= 25) { setTimeout(() => { SFX.big(); buzz([80, 40, 80, 40, 200]); celebrate(c); document.body.classList.add('shakescreen'); setTimeout(() => document.body.classList.remove('shakescreen'), 900); }, 350); }
+    if (tier) setTimeout(() => triggerPullFx(c, tier), reduceMotion() ? 180 : 280 + tier * 140);
     else if (HIT.has(c.k) || c.v >= 5) { setTimeout(() => { SFX.hit(); buzz([40, 30, 60]); }, 250); }
     else if (['dr', 'ur', 'ace', 'pb'].includes(c.k) || c.v >= 1) setTimeout(() => SFX.rare(), 200);
     else if (c.v >= .2) setTimeout(() => SFX.coin(), 150);
-    $('#tapNote').textContent = idx === 9 ? 'Tap to see your results' : 'Tap for the next card';
+    $('#tapNote').textContent = idx === cur.cards.length - 1 ? 'Tap to see your results' : 'Tap for the next card';
   } else {
     el.classList.add('out');
+    el.classList.remove('hint-glow');
     const m = document.createElement('div'); m.className = 'mini' + (HIT.has(c.k) || c.v >= 5 ? ' hit' : '');
-    m.innerHTML = `<img src="img/${c.pid}.jpg" alt="">`; $('#strip').appendChild(m);
+    if (c.k === 'code') m.innerHTML = `<div class="code-mini">CODE</div>`;
+    else m.innerHTML = `<img src="${cardSrc(c)}" alt="" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg')">`;
+    $('#strip').appendChild(m);
     idx++; cur.state = 'back';
-    if (idx >= 10) setTimeout(showSummary, 350);
+    markHint();
+    if (idx >= cur.cards.length) setTimeout(showSummary, 350);
   }
 }
 $('#revealAllBtn').onclick = () => {
   if (!cur || $('#celebrate').classList.contains('hidden') === false) return;
   const step = () => {
-    if (!cur || idx >= 10) return;
+    if (!cur || idx >= cur.cards.length) return;
     if (!$('#celebrate').classList.contains('hidden')) { setTimeout(step, 300); return; }
-    advance(); setTimeout(step, cur.state === 'face' ? 380 : 120);
+    advance(); const t = cur && cur.cards[idx] ? pullTier(cur.cards[idx].v) : 0; setTimeout(step, cur.state === 'face' ? (t ? 700 + t * 280 : 380) : 120);
   };
   step();
 };
@@ -352,7 +475,7 @@ function showSummary() {
   $('#sumNote').textContent = S.packs.length > 1
     ? `After ${S.packs.length} packs you've spent ${fmt(t.spent)} and pulled ${fmt(t.worth)} in cards (${fmtS(t.net)}).`
     : (S.resale ? 'Counting cards at 65% of their price, which is closer to what you would get if you sold them.' : 'Card values are what they are "worth" on paper. Selling usually gets about 65%.');
-  $('#sumCards').innerHTML = cards.map(c => `<div class="mini"><img src="img/${c.pid}.jpg" alt=""><span>${fmt(c.v * f)}</span></div>`).join('');
+  $('#sumCards').innerHTML = cards.map(c => `<div class="mini r-${c.k}">${c.k === 'code' ? '<div class="code-mini">CODE</div>' : `<img src="${cardSrc(c)}" alt="" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg')">`}<span>${c.k === 'code' ? '—' : fmt(c.v * f)}</span></div>`).join('');
   renderHeader(0);
   const can = balance() >= priceOf(s);
   $('#againBtn').disabled = !can; $('#againBtn').textContent = can ? `Open another · ${fmt(priceOf(s))}` : 'Out of money';
@@ -368,27 +491,69 @@ $('#doneBtn').onclick = resetStage;
 $('#againBtn').onclick = () => { resetStage(); };
 
 /* ---------- celebration fx ---------- */
-let fxRaf;
-function celebrate(c) {
-  $('#celTag').textContent = RAR[c.k].n;
-  $('#celCard').innerHTML = cardFace(c) + '<div class="holo" style="opacity:.35"></div>';
-  $('#celName').textContent = c.name; $('#celVal').textContent = fmt(c.v * factor());
-  $('#celebrate').classList.remove('hidden');
-  const cv = $('#fx'), ctx = cv.getContext('2d'), dpr = devicePixelRatio || 1;
-  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.scale(dpr, dpr);
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pullTier = v => v >= 100 ? 3 : v >= 50 ? 2 : v >= 10 ? 1 : 0;
+const BUZZ_TIER = {1: [30, 20, 50], 2: [80, 40, 80, 40, 200], 3: [50, 30, 80, 40, 80, 40, 220, 80, 320]};
+let fxRaf = 0, fxParts = [];
+function stopParticles() { cancelAnimationFrame(fxRaf); fxRaf = 0; fxParts = []; const c = $('#fxParticles'); if (c) { const x = c.getContext('2d'); x && x.clearRect(0, 0, c.width, c.height); } }
+function startParticles(tier) {
+  const cv = $('#fxParticles'); if (!cv) return;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = tier === 3 ? 100 : tier === 2 ? 70 : 36;
   const cols = ['#ffe7a8', '#f5c96a', '#ff4fd8', '#4fffd5', '#4f8bff', '#ffffff'];
-  const P = Array.from({length: 180}, () => ({x: innerWidth / 2, y: innerHeight * .42, vx: (rnd() - .5) * 14, vy: rnd() * -16 - 4, r: rnd() * 6 + 3, c: pick(cols), a: rnd() * 6, s: rnd() * .3 - .15}));
+  fxParts = Array.from({length: n}, () => ({
+    x: innerWidth / 2, y: innerHeight * .42,
+    vx: (rnd() - .5) * (10 + tier * 3), vy: rnd() * -(12 + tier * 2) - 3,
+    r: rnd() * 4 + 2, c: pick(cols), a: rnd() * 6, s: rnd() * .3 - .15, life: 1
+  }));
   cancelAnimationFrame(fxRaf);
   const loop = () => {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     let alive = 0;
-    for (const p of P) { p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.s; if (p.y < innerHeight + 20) alive++;
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore(); }
+    for (const p of fxParts) {
+      p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.s; p.life -= .008;
+      if (p.life <= 0 || p.y > innerHeight + 20) continue;
+      alive++;
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c;
+      ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
     if (alive) fxRaf = requestAnimationFrame(loop);
   };
   loop();
 }
-$('#celOk').onclick = () => { $('#celebrate').classList.add('hidden'); cancelAnimationFrame(fxRaf); };
+function hidePullFx() {
+  const fx = $('#pullFx');
+  if (fx) { fx.className = 'pull-fx hidden'; }
+  document.body.classList.remove('shakescreen', 'shake-1', 'shake-2', 'shake-3');
+  stopParticles();
+}
+function celebrate(c, tier) {
+  $('#celTag').textContent = tier === 3 ? 'Incredible pull' : tier === 2 ? 'Huge pull' : RAR[c.k].n;
+  $('#celCard').innerHTML = cardFace(c) + (FOIL[c.k] ? `<div class="foil foil-${FOIL[c.k]}"></div>` : '');
+  $('#celName').textContent = c.name; $('#celVal').textContent = fmt(c.v * factor());
+  $('#celebrate').classList.remove('hidden');
+}
+function triggerPullFx(c, tier) {
+  const rm = reduceMotion();
+  if (tier >= 2) celebrate(c, tier);
+  if (rm) {
+    if (tier >= 2) SFX.big(); else SFX.hit();
+    return;
+  }
+  if (tier === 1) SFX.hit(); else SFX.big();
+  buzz(BUZZ_TIER[tier]);
+  const fx = $('#pullFx');
+  if (fx) { fx.className = 'pull-fx t' + tier; }
+  startParticles(tier);
+  document.body.classList.add('shakescreen', 'shake-' + tier);
+  setTimeout(() => document.body.classList.remove('shakescreen', 'shake-1', 'shake-2', 'shake-3'), 900 + tier * 200);
+  if (tier === 1) setTimeout(() => { if ($('#celebrate') && !$('#celebrate').classList.contains('hidden')) return; hidePullFx(); }, 1100);
+}
+$('#celOk').onclick = () => { $('#celebrate').classList.add('hidden'); hidePullFx(); };
 
 /* ---------- stats ---------- */
 function renderStats() {
@@ -447,7 +612,7 @@ function renderBinder() {
   $('#binderCount').innerHTML = `${tc} cards<br>${all.length} different`;
   const shown = list.slice(0, 300);
   $('#binder').innerHTML = shown.length ? shown.map(c => `<div class="bcard ${HIT.has(c.k) || c.v >= 5 ? 'hit' : ''}" title="${esc(c.name)} · ${RAR[c.k].n}">
-      <img src="img/${c.pid}.jpg" alt="${esc(c.name)}" loading="lazy" onerror="this.style.display='none'">
+      <img src="${cardSrc(c)}" alt="${esc(c.name)}" loading="lazy" onerror="if(this.src.includes('.webp'))this.src=this.src.replace('.webp','.jpg'); else this.style.display='none'">
       ${c.n > 1 ? `<div class="cnt">×${c.n}</div>` : ''}
       <div class="bv2"><span>${RAR[c.k].n.split(' ').map(w => w[0]).join('')}</span><b>${fmt(c.v * factor())}</b></div></div>`).join('')
     : `<div class="empty-msg">${all.length ? 'No cards match these filters' : 'Rip a pack and your cards land here'}</div>`;
@@ -471,7 +636,7 @@ function renderOdds() {
   }).join('');
   $('#sources').innerHTML = `<b>Sources.</b> Card and pack prices: TCGplayer market prices (daily export via <a href="https://tcgcsv.com" target="_blank" rel="noopener">tcgcsv.com</a>), captured Nov 16, 2026. "Real price now" is the TCGplayer market price of a single booster pack; "store sticker" is the $4.49 US retail price for Mega Evolution-era packs (<a href="https://printedprice.com/pokemon-delta-reign" target="_blank" rel="noopener">Printed Price</a>, <a href="https://www.phdgames.com/2026/08/20/pokemon-tcg-mega-evolution-delta-reign/" target="_blank" rel="noopener">PHD Games</a>), applied to every set as an estimate.
   Pull rates: TCGplayer Authentication Center measurements (${SETS.map(s => `<a href="${s.src}" target="_blank" rel="noopener">${s.name}</a>`).join(', ')}), compiled by <a href="https://pullsim.com/sets/" target="_blank" rel="noopener">PullSim</a>.
-  <b>Simplifications (estimates):</b> packs are modeled as 4 commons, 3 uncommons, 1 reverse holo, 1 reverse-or-hit slot and 1 rare slot; every card of a rarity is equally likely; Mega Hyper Rares are placed in the hit slot; god packs, energy and code cards are left out. Card images © The Pokémon Company / Nintendo, via TCGplayer. Not affiliated with them. Prices change daily.`;
+  <b>What's in a pack.</b> Official Pokémon Support (updated May 26, 2026) says each English booster has 10 game cards, 1 Energy card and 1 Pokémon TCG Live code card, with 4 commons, 3 uncommons and 3 foils (at least one rare or higher). Collectors' breakdowns (TurnZero, Iconic TCG, TCGROI, and the July 22, 2025 PokeBeach report on Mega Evolution packs) fill in the foil slots as: 2 reverse-holo slots + 1 rare-or-better slot. One reverse slot can upgrade to an Illustration Rare or better (or, in Prismatic Evolutions: Poké Ball foil / ACE SPEC in slot 1, Master Ball / Special Illustration Rare / Hyper Rare in slot 2 — PokeBeach set guide and TCGplayer pull-rate article). Trainers appear in the common and uncommon slots at their printed rarity, not as a separate slot. Every card of a given rarity is treated as equally likely. In-pack sampling is without replacement, so the same card cannot show up twice in one pack. A Basic Energy is added from the Scarlet &amp; Violet energy sheet (valued at $0.03). The code card is shown at the end and is worth $0. A July 2025 PokeBeach note said Mega Evolution packs might include an Energy or a code card, not both; official Support in May 2026 still lists both, so this sim includes both. God packs are not modeled. Card and pack images © The Pokémon Company / Nintendo, via TCGplayer, pokemontcg.io and Bulbagarden. Not affiliated with them. Prices change daily.`;
 }
 
 /* ---------- settings ---------- */
@@ -511,6 +676,75 @@ function refresh() { if (!busy) { renderPack(); renderPicker(); renderHeader(); 
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c])); }
 let tt; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(tt); tt = setTimeout(() => t.classList.add('hidden'), 2200); }
 
+
+/* ---------- holographic foil (pointer + gyro, one shared tilt) ---------- */
+function setFoilXY(x, y) {
+  const px = Math.max(0, Math.min(100, x));
+  const py = Math.max(0, Math.min(100, y));
+  document.documentElement.style.setProperty('--foil-x', px.toFixed(1) + '%');
+  document.documentElement.style.setProperty('--foil-y', py.toFixed(1) + '%');
+}
+let foilArmed = false, foilRaf = 0, foilPending = null;
+function foilTo(x, y) {
+  foilPending = [x, y];
+  if (!foilRaf) foilRaf = requestAnimationFrame(() => { foilRaf = 0; if (foilPending) setFoilXY(foilPending[0], foilPending[1]); });
+}
+function armFoil() {
+  if (foilArmed) return;
+  foilArmed = true;
+  const onMove = e => {
+    const r = document.getElementById('deck')?.getBoundingClientRect();
+    if (!r) return;
+    foilTo((e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100);
+  };
+  window.addEventListener('pointermove', onMove, {passive: true});
+  const onOrient = e => {
+    if (e.gamma == null || e.beta == null) return;
+    foilTo((e.gamma + 45) / 90 * 100, (e.beta - 25) / 80 * 100);
+  };
+  window.addEventListener('deviceorientation', onOrient, {passive: true});
+  const ask = () => {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().catch(() => {});
+      }
+    } catch {}
+    window.removeEventListener('pointerdown', ask);
+  };
+  window.addEventListener('pointerdown', ask, {passive: true});
+}
+
 renderPicker(); renderPack(); renderHeader();
+
+window.PP_forceReveal = (cards, cost) => {
+  const s = setById(S.set);
+  const value = +cards.reduce((t, c) => t + (c.v || 0), 0).toFixed(2);
+  cur = {s, cards, cost: cost == null ? 0 : cost, value, pulled: 0, revealedVal: 0};
+  busy = true;
+  document.body.classList.add('ripping');
+  $('#summary').classList.add('hidden');
+  $('#celebrate').classList.add('hidden');
+  hidePullFx();
+  beginReveal();
+};
+window.PP_pullTier = pullTier;
+window.PP_triggerPullFx = triggerPullFx;
+window.PP_enter = enterApp;
+function enterApp() {
+  ac();
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().catch(() => {});
+    }
+  } catch {}
+  armFoil();
+  const el = $('#splash');
+  if (el) el.classList.add('out');
+  document.body.classList.remove('splashing');
+  setTimeout(() => { if (el) el.classList.add('hidden'); }, 340);
+}
+const enterBtn = $('#enterBtn'), splash = $('#splash');
+if (enterBtn) enterBtn.onclick = e => { e.stopPropagation(); enterApp(); };
+if (splash) splash.addEventListener('click', e => { if (e.target === enterBtn) return; enterApp(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

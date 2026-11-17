@@ -1,8 +1,14 @@
+@font-face{
+  font-family:"Pokemon Solid";
+  src:url("fonts/pokemon-solid.woff2") format("woff2"), url("fonts/pokemon-solid.ttf") format("truetype");
+  font-weight:400;font-style:normal;font-display:swap;
+}
 :root{
   --bg:#07070c;--bg2:#0e0e17;--panel:rgba(255,255,255,.045);--line:rgba(255,255,255,.09);
   --text:#f4f1ea;--mute:#9a96a8;--gold:#f5c96a;--gold2:#ffe7a8;--red:#ff6b7a;--green:#5ee2a0;
   --a1:#1e3a8a;--a2:#38bdf8;
   --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
+  --foil-x:50%;--foil-y:50%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
@@ -29,16 +35,46 @@ main{flex:1;padding:0 16px calc(90px + var(--safe-b))}
 .view{display:none;animation:fade .35s}.view.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}}
 
-/* set picker */
-.sets{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x mandatory;scrollbar-width:none}
-.sets::-webkit-scrollbar{display:none}
-.set-chip{flex:0 0 auto;scroll-snap-align:start;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border-radius:16px;background:var(--panel);border:1px solid var(--line);text-align:left;min-width:156px;transition:.25s}
-.set-chip b{display:block;font-size:14px}.set-chip small{color:var(--mute);font-size:12px;font-variant-numeric:tabular-nums}
-.set-chip.on{border-color:color-mix(in srgb,var(--a2) 70%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--a1) 60%,transparent),color-mix(in srgb,var(--a2) 18%,transparent));box-shadow:0 6px 24px -8px var(--a2)}
-.set-thumb{width:28px;height:52px;object-fit:cover;border-radius:4px;box-shadow:0 4px 10px rgba(0,0,0,.45);flex:0 0 auto;background:#111}
+/* pack carousel */
+.stage{position:relative;overflow-x:clip;width:100%}
+.stage::before{content:"";position:absolute;left:0;right:0;top:-30%;height:70%;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at 50% 40%, color-mix(in srgb,var(--a2) 32%,transparent), transparent 68%);
+  transition:background .55s ease}
+.pack-wrap,.carousel-mode,.tear-mode{position:relative;z-index:1;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.carousel-mode,.tear-mode{display:flex;flex-direction:column;align-items:center}
+.carousel-mode .car-meta,.carousel-mode .cta,.carousel-mode .hint,.carousel-mode .car-dots,
+.tear-mode .price-row,.tear-mode .cta,.tear-mode .hint,.tear-mode .fine{width:100%}
+
+.carousel{display:flex;align-items:stretch;overflow-x:auto;width:100%;min-width:0;scroll-snap-type:x mandatory;scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x;
+  padding:10px 0 8px;padding-inline:calc(50% - min(26vw, 105px));gap:0;position:relative}
+.carousel::-webkit-scrollbar{display:none}
+.car-item{flex:0 0 auto;width:min(52vw,210px);scroll-snap-align:center;border:0;background:none;padding:16px 10px 22px;
+  perspective:1000px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.car-pack{position:relative;width:100%;aspect-ratio:328/600;border-radius:8px 8px 10px 10px;overflow:hidden;
+  transform:scale(.78) rotateY(var(--ry,0deg)) translateZ(-36px);opacity:.55;filter:brightness(.7) saturate(.8);
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .35s,filter .35s,box-shadow .35s;
+  box-shadow:0 16px 28px rgba(0,0,0,.45);transform-style:preserve-3d;will-change:transform}
+.car-item.is-left .car-pack{--ry:22deg}
+.car-item.is-right .car-pack{--ry:-22deg}
+.car-item.is-center .car-pack{transform:scale(1) rotateY(0) translateZ(0);opacity:1;filter:none;
+  box-shadow:0 28px 44px rgba(0,0,0,.55),0 0 40px color-mix(in srgb,var(--a2) 42%,transparent)}
+.car-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;-webkit-user-drag:none}
+.car-foil{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.45) 45%,rgba(255,220,150,.3) 50%,transparent 64%);
+  background-size:250% 100%;background-position:var(--foil-x,50%) 0;mix-blend-mode:overlay}
+.car-item.is-center .car-foil{opacity:.9;animation:sheen 3.5s linear infinite}
+.car-item.holding .car-pack{transform:scale(.96) rotateY(0) translateZ(0)}
+.car-dots{display:flex;justify-content:center;gap:8px;margin:2px 0 10px}
+.car-dot{width:8px;height:8px;border-radius:50%;border:0;padding:0;background:rgba(255,255,255,.28);transition:.25s}
+.car-dot.on{width:22px;border-radius:999px;background:var(--gold);box-shadow:0 0 12px rgba(245,201,106,.7)}
+.car-meta{width:100%;text-align:center}
+.car-name{margin:2px 0 10px;font-size:22px;font-weight:900;letter-spacing:-.02em}
+.car-return b{color:var(--gold2)}
+.back-packs{align-self:flex-start;margin:0 0 4px;padding:6px 2px;color:var(--mute);font-size:13px;font-weight:700}
+.back-packs:active{color:var(--text)}
 
 /* pack */
-.stage{position:relative}
 .pack-wrap{display:flex;flex-direction:column;align-items:center}
 .pack{--tear:.115;position:relative;width:min(58vw,236px);aspect-ratio:328/600;margin:8px auto 6px;perspective:900px;touch-action:none;
   filter:drop-shadow(0 28px 36px rgba(0,0,0,.62)) drop-shadow(0 0 36px color-mix(in srgb,var(--a2) 30%,transparent));animation:float 4s ease-in-out infinite}
@@ -98,30 +134,68 @@ main{flex:1;padding:0 16px calc(90px + var(--safe-b))}
 .card{position:absolute;left:50%;top:0;width:min(70vw,290px);aspect-ratio:63/88;margin-left:calc(min(70vw,290px)/-2);
   transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.9,.25,1.15),opacity .4s;cursor:pointer}
 .card .face,.card .back{position:absolute;inset:0;border-radius:4.5%/3.2%;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
-.card .back{background:
-  radial-gradient(circle at 50% 50%,#fff 0 7%,#222 7.5% 10%,transparent 10.5%),
-  linear-gradient(180deg,#d63a3a 0 47%,#222 47% 53%,#f1f1f1 53%);
-  border:8px solid #1d3f8f;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
-.card .back::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.25) 50%,transparent 65%)}
+.card .back{
+  background-color:#0b3a8c;
+  background-image:image-set(url("img/ui/card-back.webp") type("image/webp"), url("img/ui/card-back.jpg") type("image/jpeg"));
+  background-position:center;
+  background-size:104% 104%;
+  background-repeat:no-repeat;
+  box-shadow:inset 0 0 0 1px rgba(0,20,60,.35);
+}
 .card .face{transform:rotateY(180deg);background:#111}
 .card.flipped{transform:rotateY(180deg)}
 .card.out{transform:rotateY(180deg) translate(-160%,40px) rotate(-14deg) scale(.6);opacity:0;pointer-events:none}
-.card img{width:100%;height:100%;object-fit:cover;display:block}
-.holo{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;opacity:0;
-  background:linear-gradient(115deg,transparent 20%,rgba(255,0,170,.35) 35%,rgba(0,255,230,.35) 50%,rgba(255,240,0,.3) 65%,transparent 80%);
-  background-size:300% 300%;animation:holo 3s linear infinite}
-@keyframes holo{from{background-position:0% 50%}to{background-position:100% 50%}}
-.card.r-rev .holo,.card.r-r .holo{opacity:.2}
-.card.r-dr .holo,.card.r-ur .holo,.card.r-ace .holo,.card.r-pb .holo{opacity:.32}
-.card.hit .holo{opacity:.4}
-.glow{position:absolute;inset:-14%;border-radius:20px;opacity:0;pointer-events:none;transform:translateZ(2px);filter:blur(22px);transition:opacity .6s}
-.card.flipped .glow{opacity:1}
-.card.r-r .glow,.card.r-rev .glow{background:radial-gradient(rgba(180,200,255,.35),transparent 70%)}
-.card.r-dr .glow,.card.r-ace .glow,.card.r-pb .glow{background:radial-gradient(rgba(120,200,255,.7),transparent 70%)}
-.card.r-ur .glow,.card.r-mar .glow{background:radial-gradient(rgba(190,140,255,.8),transparent 70%)}
-.card.r-ir .glow,.card.r-mb .glow{background:radial-gradient(rgba(255,140,220,.8),transparent 70%)}
-.card.r-sir .glow,.card.r-hr .glow,.card.r-mhr .glow{background:conic-gradient(from 0deg,#ff4fd8,#ffd84f,#4fffd5,#4f8bff,#ff4fd8);animation:spin 3s linear infinite}
+.card img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.code-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:16%;text-align:center;background:
+    radial-gradient(circle at 50% 20%,rgba(255,255,255,.12),transparent 50%),
+    linear-gradient(180deg,#1f4a33,#10261a 60%,#0b1a12);
+  color:#e9f6ee;border:7px solid #1f6a42;box-sizing:border-box}
+.code-kicker{font-size:9px;letter-spacing:.18em;text-transform:uppercase;opacity:.75;font-weight:800}
+.code-title{font-size:22px;font-weight:900;margin:8px 0 4px;letter-spacing:-.02em}
+.code-set{font-size:12px;font-weight:700;opacity:.9}
+.code-note{font-size:10px;line-height:1.35;opacity:.7;margin-top:10px}
+.code-mini{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#163526;color:#d4efe0;font-size:8px;font-weight:800;letter-spacing:.08em}
+/* holo foil — one layer, tilt via --foil-x / --foil-y */
+/* holo foil — one layer, tilt via --foil-x / --foil-y; paint only when flipped */
+.foil{position:absolute;inset:0;pointer-events:none;border-radius:inherit;opacity:0;z-index:2;
+  --x:var(--foil-x,50%);--y:var(--foil-y,50%);
+  mix-blend-mode:color-dodge;
+  transition:opacity .4s ease;
+  will-change:opacity;
+  contain:paint;
+}
+.card.flipped .foil, #celCard .foil{
+  background-image:
+    url("img/ui/sparkle.png"),
+    repeating-linear-gradient(-45deg,
+      rgba(255,0,128,.0) 0 6%,
+      rgba(255,0,170,.45) 10%,
+      rgba(0,240,255,.4) 16%,
+      rgba(255,240,80,.35) 22%,
+      rgba(80,140,255,.35) 28%,
+      rgba(255,0,128,.0) 34%),
+    radial-gradient(circle at var(--x) var(--y), rgba(255,255,255,.7) 0 8%, transparent 42%);
+  background-size:180px 180px, 260% 260%, 160% 160%;
+  background-position:calc(var(--x) * .4) calc(var(--y) * .4), var(--x) var(--y), var(--x) var(--y);
+  will-change:background-position,opacity;
+}
+.card.flipped .foil{opacity:.82}
+.card.flipped .foil-body{clip-path:polygon(evenodd, 0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 6.2% 11.5%, 93.8% 11.5%, 93.8% 53%, 6.2% 53%, 6.2% 11.5%)}
+/* rare glow — only rare+ when flipped; honest hint on a face-down hit */
+.glow{position:absolute;inset:-16%;border-radius:22px;opacity:0;pointer-events:none;transform:translateZ(2px);filter:blur(20px);transition:opacity .55s;z-index:-1}
+.card.flipped.r-r .glow{opacity:.9;background:radial-gradient(rgba(245,201,106,.55),transparent 70%)}
+.card.flipped.r-dr .glow{opacity:1;background:radial-gradient(rgba(255,214,110,.85),rgba(255,160,40,.35) 45%,transparent 72%);animation:glowpulse 1.8s ease-in-out infinite}
+.card.flipped.r-ur .glow,.card.flipped.r-mar .glow,.card.flipped.r-ace .glow,
+.card.flipped.r-ir .glow,.card.flipped.r-mb .glow,
+.card.flipped.r-sir .glow,.card.flipped.r-hr .glow,.card.flipped.r-mhr .glow{
+  opacity:1;
+  background:conic-gradient(from 0deg,#ff4fd8,#ffd84f,#4fffd5,#4f8bff,#ff4fd8);
+  animation:spin 3.2s linear infinite, glowpulse 1.8s ease-in-out infinite}
 @keyframes spin{to{transform:translateZ(2px) rotate(360deg)}}
+@keyframes glowpulse{50%{filter:blur(26px);opacity:.75}}
+.card.hint-glow .glow{opacity:.7;background:conic-gradient(from 90deg,#ff4fd8,#ffd84f,#4fffd5,#4f8bff,#ff4fd8);animation:spin 4s linear infinite, hintpulse 1.6s ease-in-out infinite;filter:blur(18px)}
+@keyframes hintpulse{50%{opacity:.35;filter:blur(24px)}}
 .ribbon{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,.85));display:flex;justify-content:space-between;align-items:flex-end;gap:6px}
 .ribbon .nm{font-weight:800;font-size:14px;line-height:1.1}
 .ribbon .rt{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-top:2px}
@@ -129,6 +203,7 @@ main{flex:1;padding:0 16px calc(90px + var(--safe-b))}
 .fallback{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:16px;text-align:center;
   background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.25),transparent 55%),linear-gradient(160deg,var(--a1),#111 60%,var(--a2))}
 .fallback .fb-n{font-size:20px;font-weight:900}.fallback .fb-r{font-size:11px;opacity:.8;margin-top:6px;letter-spacing:.1em;text-transform:uppercase}
+.badge,.ribbon{z-index:3}
 .badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px;background:rgba(0,0,0,.65);letter-spacing:.06em}
 .tapnote{text-align:center;color:var(--mute);font-size:13px;margin-top:4px}
 .strip{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
@@ -145,7 +220,7 @@ main{flex:1;padding:0 16px calc(90px + var(--safe-b))}
 .sum-grid b{display:block;font-size:22px;font-variant-numeric:tabular-nums;margin-top:2px}
 .sum-grid .big{grid-column:1/-1;text-align:center}.sum-grid .big b{font-size:36px}
 .sum-best{margin-top:12px;text-align:center;font-size:14px;color:var(--gold2)}
-.sum-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}
+.sum-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
 .sum-cards .mini{aspect-ratio:63/88;border-radius:4px;overflow:hidden;position:relative}
 .sum-cards .mini img{width:100%;height:100%;object-fit:cover}
 .sum-cards .mini span{position:absolute;bottom:0;left:0;right:0;font-size:10px;font-weight:800;text-align:center;background:rgba(0,0,0,.75);color:var(--gold2);padding:2px 0}
@@ -242,4 +317,77 @@ select option{background:#15151f}
 .shakescreen{animation:shake .4s 2}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
 
-.ripping .sets{display:none}
+.ripping .carousel-mode{display:none}
+
+@media (prefers-reduced-motion: reduce){
+  .glow,.card.hint-glow .glow,.card.flipped.r-dr .glow,.foil{animation:none!important}
+}
+
+/* splash / enter screen */
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.splash{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:#07070c;overflow:hidden;transition:opacity .32s ease, visibility .32s}
+.splash.out{opacity:0;visibility:hidden;pointer-events:none}
+body.splashing{overflow:hidden}
+.splash-bg{position:absolute;inset:0;pointer-events:none}
+.splash-glow{position:absolute;left:50%;top:38%;width:140%;height:70%;transform:translate(-50%,-50%);
+  background:radial-gradient(ellipse,rgba(42,117,187,.38),transparent 68%)}
+.splash-sparkles{position:absolute;inset:0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%,rgba(255,255,255,.9),transparent),
+    radial-gradient(1.5px 1.5px at 78% 18%,rgba(255,231,168,.9),transparent),
+    radial-gradient(2px 2px at 88% 62%,rgba(255,255,255,.75),transparent),
+    radial-gradient(1.5px 1.5px at 18% 72%,rgba(255,231,168,.8),transparent),
+    radial-gradient(1.5px 1.5px at 64% 80%,rgba(255,255,255,.7),transparent),
+    radial-gradient(2px 2px at 40% 14%,rgba(255,255,255,.8),transparent),
+    radial-gradient(1.5px 1.5px at 52% 48%,rgba(255,231,168,.55),transparent);
+  animation:twinkle 3.2s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.45}to{opacity:1}}
+.splash-pack{position:absolute;width:min(28vw,120px);aspect-ratio:328/600;object-fit:fill;border-radius:6px;
+  opacity:.32;filter:drop-shadow(0 16px 20px rgba(0,0,0,.5));animation:packfloat 8s ease-in-out infinite}
+.splash-pack.p1{left:-4%;top:12%;transform:rotate(-14deg);animation-duration:9s}
+.splash-pack.p2{right:-6%;top:16%;transform:rotate(12deg);animation-duration:7.5s;animation-delay:-2s}
+.splash-pack.p3{left:4%;bottom:6%;transform:rotate(10deg);animation-duration:10s;animation-delay:-4s;opacity:.22}
+.splash-pack.p4{right:2%;bottom:8%;transform:rotate(-8deg);animation-duration:8.5s;animation-delay:-1s;opacity:.22}
+@keyframes packfloat{0%,100%{transform:translateY(0) rotate(var(--r,0deg))}50%{transform:translateY(-14px) rotate(var(--r,0deg))}}
+.splash-pack.p1{--r:-14deg}.splash-pack.p2{--r:12deg}.splash-pack.p3{--r:10deg}.splash-pack.p4{--r:-8deg}
+.splash-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;width:min(92vw,440px);padding:20px}
+.splash-logo{width:100%;height:auto;overflow:visible;filter:drop-shadow(0 10px 22px rgba(0,0,0,.45))}
+.splash-logo text{font-family:"Pokemon Solid","Arial Black",system-ui,sans-serif;paint-order:stroke fill;
+  stroke-linejoin:round;stroke-linecap:round;fill:#FFCB05}
+.splash-logo .logo-zara{font-size:118px;stroke:#2A75BB;stroke-width:16px}
+.splash-logo .logo-poke{font-size:164px;stroke:#2A75BB;stroke-width:18px}
+.splash-logo .logo-shadow{fill:#163e72;stroke:#163e72;transform:translate(0,9px)}
+.enter-btn{width:auto;min-width:70%;margin-top:18px;padding:16px 28px;font-size:18px;animation:enterpulse 1.6s ease-in-out infinite}
+@keyframes enterpulse{50%{box-shadow:0 14px 42px -6px rgba(245,201,106,1),inset 0 1px 0 rgba(255,255,255,.7);filter:brightness(1.07)}}
+
+/* big-pull FX */
+.pull-fx{position:fixed;inset:0;z-index:85;pointer-events:none}
+.pull-fx.hidden{display:none!important}
+.fx-flash{position:absolute;inset:0;background:#fff;opacity:0}
+.pull-fx.t1 .fx-flash{animation:flash1 .45s ease-out}
+.pull-fx.t2 .fx-flash{animation:flash2 .7s ease-out}
+.pull-fx.t3 .fx-flash{animation:flash3 .9s ease-out}
+@keyframes flash1{0%{opacity:.5}100%{opacity:0}}
+@keyframes flash2{0%{opacity:.85}22%{opacity:.4}100%{opacity:0}}
+@keyframes flash3{0%{opacity:1}18%{opacity:.65}100%{opacity:0}}
+.fx-rays{position:absolute;left:50%;top:42%;width:180vmax;height:180vmax;transform:translate(-50%,-50%);
+  background:repeating-conic-gradient(from 0deg,rgba(255,230,160,0) 0 7deg,rgba(255,230,160,.3) 8deg 11deg,rgba(255,255,255,0) 12deg 20deg);
+  mix-blend-mode:screen;opacity:0}
+.pull-fx.t2 .fx-rays,.pull-fx.t3 .fx-rays{opacity:1;animation:rayspin 9s linear infinite, rayin 1.4s ease-out both}
+.pull-fx.t3 .fx-rays{filter:saturate(1.25) brightness(1.15)}
+@keyframes rayspin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes rayin{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}to{opacity:1}}
+#fxParticles{position:absolute;inset:0;width:100%;height:100%}
+.card.slowmo-1{transition-duration:1.05s}
+.card.slowmo-2{transition-duration:1.35s}
+.card.slowmo-3{transition-duration:1.7s}
+.shakescreen.shake-1{animation:shake .35s 1}
+.shakescreen.shake-2{animation:shake .4s 2}
+.shakescreen.shake-3{animation:shakegold .5s 3}
+@keyframes shakegold{20%{transform:translate(-5px,-2px) rotate(-.8deg)}60%{transform:translate(5px,2px) rotate(.8deg)}100%{transform:none}}
+
+@media (prefers-reduced-motion: reduce){
+  .splash-sparkles,.splash-pack,.enter-btn,.fx-flash,.fx-rays,.car-item.is-center .car-foil{animation:none!important}
+  .car-pack{transition:none}
+}

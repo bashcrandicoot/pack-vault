@@ -1,0 +1,13 @@
+Scarlet & Violet–era official Basic Energy cards (English), images via pokemontcg.io (Pokémon TCG API scans):
+
+  img/energy/grass.webp      Basic Grass Energy      https://images.pokemontcg.io/sve/1_hires.png
+  img/energy/fire.webp       Basic Fire Energy       https://images.pokemontcg.io/sve/2_hires.png
+  img/energy/water.webp      Basic Water Energy      https://images.pokemontcg.io/sve/3_hires.png
+  img/energy/lightning.webp  Basic Lightning Energy  https://images.pokemontcg.io/sve/4_hires.png
+  img/energy/psychic.webp    Basic Psychic Energy    https://images.pokemontcg.io/sve/5_hires.png
+  img/energy/fighting.webp   Basic Fighting Energy   https://images.pokemontcg.io/sve/6_hires.png
+  img/energy/darkness.webp   Basic Darkness Energy   https://images.pokemontcg.io/sve/7_hires.png
+  img/energy/metal.webp      Basic Metal Energy      https://images.pokemontcg.io/sve/8_hires.png
+
+These are the standard 8 Basic Energies included in English Scarlet & Violet / Mega Evolution booster packs.
+Market value used in the simulator: $0.03 each (typical bulk). Card art © The Pokémon Company / Nintendo.

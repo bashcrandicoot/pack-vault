@@ -1,6 +1,6 @@
 {
-  "name": "Pack Vault — Pack Opening Simulator",
-  "short_name": "Pack Vault",
+  "name": "Zara's Poképacks",
+  "short_name": "Zara's Poképacks",
   "description": "Rip packs with real pull rates and real prices, and see spend vs value.",
   "start_url": "./",
   "scope": "./",

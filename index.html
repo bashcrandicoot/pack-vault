@@ -7,15 +7,40 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Pack Vault">
+<meta name="apple-mobile-web-app-title" content="Zara's Poképacks">
 <meta name="description" content="A pack-opening simulator with real pull rates and real card prices that tracks what you spend versus what you pull.">
-<title>Pack Vault</title>
+<title>Zara's Poképacks</title>
+<link rel="preload" href="fonts/pokemon-solid.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="splashing">
+<div id="splash" class="splash" role="dialog" aria-modal="true" aria-labelledby="splashTitle">
+  <div class="splash-bg" aria-hidden="true">
+    <div class="splash-glow"></div>
+    <div class="splash-sparkles"></div>
+    <img class="splash-pack p1" src="img/packs/pfl.webp" alt="">
+    <img class="splash-pack p2" src="img/packs/asc.webp" alt="">
+    <img class="splash-pack p3" src="img/packs/pre.webp" alt="">
+    <img class="splash-pack p4" src="img/packs/cri.webp" alt="">
+  </div>
+  <div class="splash-content">
+    <h1 id="splashTitle" class="visually-hidden">Zara's Poképacks</h1>
+    <svg class="splash-logo" viewBox="0 0 900 420" role="img" aria-hidden="true">
+      <defs>
+        <path id="arcZara" d="M 170,148 Q 450,86 730,148"/>
+        <path id="arcPoke" d="M 16,332 Q 450,228 884,332"/>
+      </defs>
+      <text class="logo-shadow logo-zara"><textPath href="#arcZara" startOffset="50%" text-anchor="middle">Zara's</textPath></text>
+      <text class="logo-shadow logo-poke"><textPath href="#arcPoke" startOffset="50%" text-anchor="middle">Poképacks</textPath></text>
+      <text class="logo-zara"><textPath href="#arcZara" startOffset="50%" text-anchor="middle">Zara's</textPath></text>
+      <text class="logo-poke"><textPath href="#arcPoke" startOffset="50%" text-anchor="middle">Poképacks</textPath></text>
+    </svg>
+    <button type="button" class="cta enter-btn" id="enterBtn">Tap to Enter</button>
+  </div>
+</div>
 <div id="app">
   <header class="top">
     <div class="bal">
@@ -30,38 +55,54 @@
   <main>
     <!-- RIP -->
     <section class="view active" id="v-rip">
-      <div class="sets" id="setPicker"></div>
       <div class="stage" id="stage">
         <div class="pack-wrap" id="packWrap">
-          <div class="pack" id="pack">
-            <div class="pack-inner" id="packInner">
-              <div class="pack-mouth" aria-hidden="true"></div>
-              <div class="pack-body">
-                <img class="pack-photo" id="packPhoto" alt="">
-                <div class="pack-foil"></div>
+          <div class="carousel-mode" id="carouselMode">
+            <div class="carousel" id="carousel" aria-label="Choose a pack"></div>
+            <div class="car-dots" id="carDots"></div>
+            <div class="car-meta">
+              <h2 class="car-name" id="carName"></h2>
+              <div class="price-row">
+                <div><span class="k">Pack costs</span><b id="carPrice"></b></div>
+                <div><span class="k">Average pull</span><b id="carEv"></b></div>
               </div>
-              <div class="pack-top" id="packTop">
-                <img class="pack-photo" id="packPhotoTop" alt="">
-                <div class="pack-foil"></div>
-                <div class="tear-hint" id="tearHint">swipe to tear</div>
-              </div>
-              <div class="tear-dash" aria-hidden="true"></div>
+              <p class="fine car-return" id="evLine"></p>
             </div>
+            <button class="cta" id="pickBtn">Pick up this pack</button>
+            <p class="hint" id="carHint">Tap the pack in the middle to pick it up</p>
           </div>
-          <div class="hint" id="hint">Swipe across the top to rip ➜</div>
-          <div class="price-row">
-            <div><span class="k">Pack costs</span><b id="packPrice"></b></div>
-            <div><span class="k">Average pull</span><b id="packEv"></b></div>
+          <div class="tear-mode hidden" id="tearMode">
+            <button class="back-packs" id="backPacks" type="button">← All packs</button>
+            <div class="pack" id="pack">
+              <div class="pack-inner" id="packInner">
+                <div class="pack-mouth" aria-hidden="true"></div>
+                <div class="pack-body">
+                  <img class="pack-photo" id="packPhoto" alt="">
+                  <div class="pack-foil"></div>
+                </div>
+                <div class="pack-top" id="packTop">
+                  <img class="pack-photo" id="packPhotoTop" alt="">
+                  <div class="pack-foil"></div>
+                  <div class="tear-hint" id="tearHint">swipe to tear</div>
+                </div>
+                <div class="tear-dash" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="hint" id="hint">Swipe across the top to rip ➜</div>
+            <div class="price-row">
+              <div><span class="k">Pack costs</span><b id="packPrice"></b></div>
+              <div><span class="k">Average pull</span><b id="packEv"></b></div>
+            </div>
+            <button class="cta" id="ripBtn">Rip it open</button>
+            <p class="fine" id="tearEvLine"></p>
           </div>
-          <button class="cta" id="ripBtn">Rip it open</button>
-          <p class="fine" id="evLine"></p>
         </div>
 
         <div class="reveal hidden" id="reveal">
           <div class="tally">
             <div><span class="k">Paid</span><b id="tPaid"></b></div>
             <div><span class="k">Pulled</span><b id="tPulled">$0.00</b></div>
-            <div><span class="k">Cards</span><b id="tCount">0/10</b></div>
+            <div><span class="k">Cards</span><b id="tCount">0/12</b></div>
           </div>
           <div class="deck" id="deck"></div>
           <div class="tapnote" id="tapNote">Tap the card to flip</div>
@@ -124,7 +165,7 @@
 
     <!-- ODDS -->
     <section class="view" id="v-odds">
-      <div class="odds-intro">Real odds from thousands of opened packs, and real card prices. "Average pull" is what one pack's cards are worth on average.</div>
+      <div class="odds-intro">Real odds from thousands of opened packs, and real card prices. “Average pull” is what one pack’s 10 game cards plus a Basic Energy are worth on average.</div>
       <div id="oddsList"></div>
       <footer class="sources" id="sources"></footer>
     </section>
@@ -154,6 +195,7 @@
     </div>
     <p class="fine">"Real price now" is what a single pack sells for today (TCGplayer market). "Store sticker" is the $4.49 retail price, when stores have them.</p>
     <label class="toggle"><input type="checkbox" id="hapticT"><span>Vibration</span></label>
+    <p class="fine">Works on most Android phones. iPhone Safari can't vibrate, so you won't feel a buzz on iOS.</p>
     <div class="row-btns">
       <button class="danger" id="resetBtn">Reset everything</button>
       <button class="cta small" id="closeSheet">Done</button>
@@ -169,8 +211,13 @@
   </div>
 </div>
 
+<div id="pullFx" class="pull-fx hidden" aria-hidden="true">
+  <div class="fx-flash"></div>
+  <div class="fx-rays"></div>
+  <canvas id="fxParticles"></canvas>
+</div>
+
 <div class="celebrate hidden" id="celebrate">
-  <canvas id="fx"></canvas>
   <div class="cel-inner">
     <div class="cel-tag" id="celTag"></div>
     <div class="cel-card" id="celCard"></div>
@@ -184,6 +231,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="pack-model.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,9 @@
+card-back.webp / card-back.jpg
+  Official English Pokémon TCG card back, from Bulbagarden Archives File:Cardback.jpg
+  https://archives.bulbagarden.net/media/upload/1/17/Cardback.jpg
+  https://bulbapedia.bulbagarden.net/wiki/File:Cardback.jpg
+  Source note on the file: Alternative Play Handbook (credit to JP from pkmncards.com), uploaded 22 March 2024.
+  Card back art © The Pokémon Company / Nintendo. Used here as the face-down card back in a nonprofit pack-odds simulator.
+
+sparkle.png
+  Tiny procedural sparkle texture for the holographic foil overlay (not third-party art).
